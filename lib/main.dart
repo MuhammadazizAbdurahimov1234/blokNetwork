@@ -1,12 +1,13 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
-
-import 'a/post.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_dars/a/networking_bloc.dart';
 
 void main() {
   runApp(MaterialApp(
-    home: MyApp(),
+    home: BlocProvider(
+      create: (context) => NetworkingBloc(),
+      child: MyApp(),
+    ),
   ));
 }
 
@@ -18,41 +19,55 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  Dio dio = Dio();
 
-  Future<Post> loadData() async {
-    try {
-      var response =
-          await dio.get("https://jsonplaceholder.typicode.com/posts/1");
-      if (response.statusCode == 200) {
-        return Post.fromJson(response.data);
-      } else {
-        throw Exception("error");
-      }
-    } on DioException catch (e) {
-      throw Exception(e);
-    }
+  @override
+  void initState() {
+    super.initState();
+    BlocProvider.of<NetworkingBloc>(context).add(NetworkLoad());
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Networking"),
+        title: Text("Network+bloc"),
       ),
-      body: FutureBuilder(
-          future: loadData(),
-          builder: (BuildContext context, AsyncSnapshot<Post> snapshot) {
-            if (snapshot.hasData) {
-              return Center(child: Text(snapshot.data?.body ?? "Empty"));
-            } else if (snapshot.hasError) {
-              return Center(child: Text(snapshot.error.toString()));
-            } else {
-              return Center(
-                child: CircularProgressIndicator(),
-              );
-            }
-          }),
+      body: RefreshIndicator(onRefresh: () async {
+        BlocProvider.of<NetworkingBloc>(context).add(NetworkLoad());
+      }, child: BlocBuilder<NetworkingBloc, NetworkingState>(
+        builder: (context, state) {
+          if (state is NetworkingLoading) {
+            return Center(
+              child: CircularProgressIndicator(),
+            );
+          } else if (state is NetworkingError) {
+            return Center(
+              child: Text(
+                state.message,
+              ),
+            );
+          } else if (state is NetworkingSuccess) {
+            return ListView.builder(
+                itemCount: state.posts.length,
+                itemBuilder: (BuildContext context, int index) {
+                  return Container(
+                    alignment: Alignment.center,
+                    margin: EdgeInsets.all(10),
+                    width: MediaQuery
+                        .of(context)
+                        .size
+                        .width,
+                    height: 50,
+                    color: Colors.green,
+                    child: Text(state.posts[index].title ?? "bosh"),
+                  );
+                });
+          }
+          else {
+            return Container();
+          }
+        },
+      )),
     );
   }
 }
